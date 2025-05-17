@@ -1,0 +1,99 @@
+// Medical Terminology Quiz Web App for Siyoung
+// Features: Excel upload, random quiz, multi-answer matching, bidirectional mode
+
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import * as XLSX from "xlsx";
+
+export default function QuizApp() {
+  const [wordPairs, setWordPairs] = useState([]);
+  const [current, setCurrent] = useState(null);
+  const [input, setInput] = useState("");
+  const [direction, setDirection] = useState("ko-to-en"); // or "en-to-ko"
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(null);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      const parsed = rows
+        .filter((row) => row.length >= 2)
+        .map(([ko, en]) => ({
+          ko: ko.trim(),
+          en: en.trim(),
+        }));
+      setWordPairs(parsed);
+      setCurrent(parsed[Math.floor(Math.random() * parsed.length)]);
+      setInput("");
+      setShowAnswer(false);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const checkAnswer = () => {
+    const correct =
+      direction === "ko-to-en"
+        ? current.en.split(",").some((ans) => ans.trim().toLowerCase() === input.trim().toLowerCase())
+        : current.ko.split(",").some((ans) => ans.trim() === input.trim());
+    setIsCorrect(correct);
+    setShowAnswer(true);
+  };
+
+  const nextQuestion = () => {
+    setCurrent(wordPairs[Math.floor(Math.random() * wordPairs.length)]);
+    setInput("");
+    setShowAnswer(false);
+    setIsCorrect(null);
+  };
+
+  const toggleDirection = () => {
+    setDirection((d) => (d === "ko-to-en" ? "en-to-ko" : "ko-to-en"));
+    nextQuestion();
+  };
+
+  return (
+    <div className="p-4 max-w-xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">의학용어 퀴즈 - Siyoung</h1>
+
+      <div className="mb-4">
+        <Input type="file" accept=".xlsx" onChange={handleFileUpload} />
+      </div>
+
+      {current && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <p className="text-lg">
+              <strong>문제:</strong>{" "}
+              {direction === "ko-to-en" ? current.ko : current.en}
+            </p>
+            <Input
+              className="mt-2"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="정답을 입력하세요"
+            />
+            <div className="mt-2 flex gap-2">
+              <Button onClick={checkAnswer}>제출</Button>
+              <Button onClick={nextQuestion}>다음 문제</Button>
+              <Button variant="outline" onClick={toggleDirection}>
+                방향 전환 ({direction === "ko-to-en" ? "한→영" : "영→한"})
+              </Button>
+            </div>
+            {showAnswer && (
+              <p className="mt-2">
+                {isCorrect ? "✅ 정답입니다!" : `❌ 오답입니다. 정답: ${direction === "ko-to-en" ? current.en : current.ko}`}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
